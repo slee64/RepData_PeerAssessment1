@@ -1,25 +1,74 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+```{r, echo=TRUE}
+# Load data
+library(ggplot2)
+options(scipen = 1)
+unzip("activity.zip")
+data <- read.csv("activity.csv", colClasses = c("integer", "Date", "character"))
+data$day <- factor(paste(substring(months(as.Date(data$date)),0,3), 
+                             substring(as.Date  (data$date), 9), sep=" ")) 
+tidyData <- na.omit(data)
+head(tidyData)
 
+# Mean total steps per day
+tidyData$month <- as.numeric(format(date, "%m"))
+ggplot(tidyData, aes(date, steps)) + 
+  geom_bar(stat = "identity", colour = "blue", fill = "blue", width = 0.5) + facet_grid(. ~ month, scales = "free") + 
+  labs(title = "Total Number of Steps Per Day", x = "Date", y = "Total Number of Steps")
 
-## Loading and preprocessing the data
+# Mean and median
+tot_steps <- aggregate(tidyData$steps, list(tidyData$date), FUN="sum")
+names(tot_steps) <- c("date","total")
+tot_steps$date <- factor(paste(substring(months(as.Date(tot_steps$date)),0,3), substring(as.Date  (tot_steps$date), 9), sep=" ")) 
+print(round(mean(tot_steps$total)))
+print(median(tot_steps$total))
 
+# Average daily steps
+avgSteps <- aggregate(tidyData$steps, list(interval = as.numeric(tidyData$interval)), FUN = "mean")
 
+ggplot(avgSteps, aes(interval, x)) + geom_point() + labs(title = "Time Series of the 5-minute Interval", x = "5-minute Intervals", y = "Average Number of Steps Taken")
 
-## What is mean total number of steps taken per day?
+max(avgSteps$x)
 
+# Filling in missing steps
+activity_steps <- aggregate(tidyData$steps, list(as.numeric(tidyData$interval)), FUN="mean")
+names(activity_steps) <- c("interval","mean")
 
+missingSteps <- which(is.na(data))
+print(length(missingSteps))
 
-## What is the average daily activity pattern?
+# Missing values replaced by corresponding mean 5-minute internal steps
 
+newData <- data
+for(i in 1:length(missingSteps)){
+    newData[missingSteps[i], 1] <- activity_steps[activity_steps$interval == newData[missingSteps[i],]$interval,]$mean
+}
 
+## Histogram of total Number of Steps per day
+totSteps <- aggregate(newData$steps, list(newData$date), FUN="sum")
+names(totSteps) <- c("date","total")
+totSteps$date <- factor(paste(substring(months(as.Date(totSteps$date)),0,3), 
+                               substring(as.Date  (totSteps$date), 9), sep=" ")) 
+barplot(totSteps$total, names.arg=totSteps$date, xlab="Days", ylab="Total Steps",
+        main="Total Steps Count Per Day", col="green")
 
-## Imputing missing values
+# Mean and median steps
+print(round(mean(totSteps$total))) 
+print(median(totSteps$total))
 
+# Weekday vs Weekend
+newData$daysOfWeek <- factor(weekdays(newData$date))
+levels(newData$daysOfWeek)
 
+levels(newData$daysOfWeek) <- list(weekday = c("Monday", "Tuesday", "Wednesday", 
+                                               "Thursday", "Friday"),
+                                   weekend = c("Saturday", "Sunday"))
+table(newData$daysOfWeek)
 
-## Are there differences in activity patterns between weekdays and weekends?
+library(lattice)
+meanSteps <- aggregate(newData$steps, list(as.numeric(newData$interval),newData$daysOfWeek), FUN = "mean")
+names(meanSteps) <- c("interval","weekDays", "avgSteps")
+
+xyplot(meanSteps$avgSteps ~ meanSteps$interval | meanSteps$weekDays, 
+       layout = c(1, 2), type = "l", 
+       xlab = "Interval", ylab = "Number of steps")
+```
